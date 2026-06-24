@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Hidrografia e Nascentes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Segoe UI", Arial, sans-serif; }
+  html, body { height: 100%; }
+  #mapa { width: 100%; height: 100vh; }
+
+  .topo {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 1000;
+    background: #1a3550;
+    color: #fff;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+
+  .topo h1 {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  .topo h1 span { color: #6fc3b3; }
+
+  .legenda {
+    position: absolute;
+    bottom: 24px;
+    right: 12px;
+    z-index: 1000;
+    background: #fff;
+    padding: 14px 16px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    max-width: 220px;
+  }
+
+  .legenda h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #1a3550;
+    margin-bottom: 8px;
+  }
+
+  .legenda .item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .legenda .linha {
+    width: 22px;
+    height: 0;
+    border-top: 3px solid;
+    display: inline-block;
+  }
+
+  .legenda .ponto {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 2px solid #fff;
+  }
+
+  .leaflet-popup-content b { color: #1a3550; }
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <h1>Mapa de Hidrografia<span> &amp; Nascentes</span></h1>
+</div>
+
+<div id="mapa"></div>
+
+<div class="legenda">
+  <h3>Legenda</h3>
+  <div class="item"><span class="linha" style="border-color:#1f6fb2;"></span> Perene</div>
+  <div class="item"><span class="linha" style="border-color:#52a8d8;"></span> Intermitente</div>
+  <div class="item"><span class="linha" style="border-color:#9bcbe8; border-top-style: dashed;"></span> Efêmero</div>
+  <div class="item"><span class="ponto" style="background:#2f7a6e;"></span> Nascente</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div id="erro-aviso" style="display:none; position:absolute; top:70px; left:12px; z-index:2000; background:#fff3f3; border:1px solid #e53e3e; color:#9b2c2c; padding:12px 16px; border-radius:6px; max-width:340px; font-size:0.85rem;"></div>
+<script>
+function mostrarErro(msg) {
+  const caixa = document.getElementById('erro-aviso');
+  caixa.style.display = 'block';
+  caixa.innerHTML = '<b>Não foi possível carregar o mapa:</b><br>' + msg;
+}
+
+window.addEventListener('error', (e) => {
+  mostrarErro(e.message || 'erro desconhecido ao carregar script.');
+});
+
+async function iniciar() {
+  if (typeof L === 'undefined') {
+    mostrarErro('A biblioteca do mapa (Leaflet) não carregou. Verifique sua conexão ou se algum bloqueador de anúncios/firewall está impedindo o carregamento de scripts externos.');
+    return;
+  }
+  const mapa = L.map('mapa');
+
+  const satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20,
+    attribution: 'Tiles &copy; Esri'
+  });
+
+  const ruas = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 20,
+    attribution: '&copy; OpenStreetMap contributors'
+  });
+
+  satelite.addTo(mapa);
+
+  const corPorClasse = {
+    "Perene": "#1f6fb2",
+    "Intermitente": "#52a8d8",
+    "Efemero": "#9bcbe8"
+  };
+
+  let hidro, nasc;
+  try {
+    const [hidroResp, nascResp] = await Promise.all([
+      fetch('hidrografia.geojson'),
+      fetch('nascentes.geojson')
+    ]);
+    if (!hidroResp.ok || !nascResp.ok) {
+      throw new Error(`Falha ao buscar arquivos (status ${hidroResp.status}/${nascResp.status}).`);
+    }
+    hidro = await hidroResp.json();
+    nasc = await nascResp.json();
+  } catch (err) {
+    mostrar
